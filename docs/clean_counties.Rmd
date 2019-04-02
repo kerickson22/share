@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 As a working example, let's look at records of Tracheophytes in Florida. These data came from downloading  (on GBIF) all of the occurrences of Tracheophytes that: 
+
 1. Had no coordinates
 2. stateProvince == "Florida"
 
