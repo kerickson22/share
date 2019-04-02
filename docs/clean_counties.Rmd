@@ -111,6 +111,7 @@ nrow(tracheophytes_clean)
 #Now there are 240, 175 records with GADM standard county names. An improvement!
 ```  
 Starting to look better!
+
 #2. Fix capitalization 
 The next thing to standardize is how GBIF counties are capitalized: 
 ```{r, fix capitalization}
@@ -145,6 +146,8 @@ nrow(tracheophytes_clean)
  The `printIssues` function prints out groupings that the `compare` function noticed as being potentially similar to eachother. Groupings are separated by '...'. 
  
  You will notice right away that not everything the computer identifies as being similar is actually similar. Hence the need for a human to read through them and spot similarities. 
+ 
+#3. Look at remaining differences by hand 
 
 ```{r, a function to help spot similar looking spellings} 
 #The function compare 
@@ -177,7 +180,7 @@ issues<- compare(counties_GBIF, counties_GBIF)
 printIssues(issues, counties_GBIF)
 ```
 
-#The final step (really it's an iterative process):
+#4. Make use of lookup table to fix misspellings 
 Now let's fix some of those spellings by making use of a crosswalk table. I have gone through the list above and put misspellings that I noticed into the csv file. 
 
 As you go through you will probably introduce some new errors: For example if you are trying to convert 'Saint John' to the GADM-standard Saint Johns, records that already had Saint Johns correctly spelled will suddenly become Saint Johnss. So you will then need to replace 'Saint Johnss' with Saint Johns. So it's a very iterative process.
@@ -207,7 +210,7 @@ unique(tracheophytes_messy$county)
 
 
 ```
-#Next step: figure out why the renameCounty function isn't working 100%
+#5. Next step: figure out why the renameCounty function isn't working 100%
 
 As you can see from the unique list of "messy" records (those whose county still doesn't officially match a GADM county), there are still some counties whose spellings _should_ have been fixed by the renameCounty function. And yet... 
 

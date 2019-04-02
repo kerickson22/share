@@ -1447,7 +1447,11 @@ unique(tracheophytes_nocoords$county)</code></pre>
 nrow(tracheophytes_clean)</code></pre>
 <pre><code>## [1] 240176</code></pre>
 <pre class="r"><code>#Now there are 240, 175 records with GADM standard county names. An improvement!</code></pre>
-<p>Starting to look better! #2. Fix capitalization The next thing to standardize is how GBIF counties are capitalized:</p>
+<p>Starting to look better!</p>
+</div>
+<div id="fix-capitalization" class="section level1">
+<h1>2. Fix capitalization</h1>
+<p>The next thing to standardize is how GBIF counties are capitalized:</p>
 <pre class="r"><code>#The capwords function comes from the chartr {base} helpfile
 
 #First convert everything to lowercase 
@@ -1717,6 +1721,9 @@ nrow(tracheophytes_clean)</code></pre>
 <p>I have written two functions <code>compare</code> and <code>printIssues</code> that help automate some of the process. First the <code>compare</code> function figures out all of the counties whose names are “close-enough” to other counties names</p>
 <p>The <code>printIssues</code> function prints out groupings that the <code>compare</code> function noticed as being potentially similar to eachother. Groupings are separated by ‘…’.</p>
 <p>You will notice right away that not everything the computer identifies as being similar is actually similar. Hence the need for a human to read through them and spot similarities.</p>
+</div>
+<div id="look-at-remaining-differences-by-hand" class="section level1">
+<h1>3. Look at remaining differences by hand</h1>
 <pre class="r"><code>#The function compare 
 compare &lt;- function(this, that) {
     issues &lt;- NULL
@@ -2373,8 +2380,8 @@ printIssues(issues, counties_GBIF)</code></pre>
 ## [1] &quot;Jefferson&quot; &quot;Henderson&quot; &quot;Person&quot;   
 ## [1] &quot;...&quot;</code></pre>
 </div>
-<div id="the-final-step-really-its-an-iterative-process" class="section level1">
-<h1>The final step (really it’s an iterative process):</h1>
+<div id="make-use-of-lookup-table-to-fix-misspellings" class="section level1">
+<h1>4. Make use of lookup table to fix misspellings</h1>
 <p>Now let’s fix some of those spellings by making use of a crosswalk table. I have gone through the list above and put misspellings that I noticed into the csv file.</p>
 <p>As you go through you will probably introduce some new errors: For example if you are trying to convert ‘Saint John’ to the GADM-standard Saint Johns, records that already had Saint Johns correctly spelled will suddenly become Saint Johnss. So you will then need to replace ‘Saint Johnss’ with Saint Johns. So it’s a very iterative process.</p>
 <p>The .csv file counties_lookup contains the crosswalk table I constructed. The function <code>renameCounties</code> makes use of the crosswalk table to correct the spelling of GBIF counties to resemble GADM spellings. I have so far only been working with counties in Florida. This function and the ones above will have to be modified to work for different states.</p>
@@ -2576,7 +2583,7 @@ unique(tracheophytes_messy$county)</code></pre>
 ## [177] &quot;Person&quot;</code></pre>
 </div>
 <div id="next-step-figure-out-why-the-renamecounty-function-isnt-working-100" class="section level1">
-<h1>Next step: figure out why the renameCounty function isn’t working 100%</h1>
+<h1>5. Next step: figure out why the renameCounty function isn’t working 100%</h1>
 <p>As you can see from the unique list of “messy” records (those whose county still doesn’t officially match a GADM county), there are still some counties whose spellings <em>should</em> have been fixed by the renameCounty function. And yet…</p>
 <p>I modified this workflow from a similar process for renaming collectors, so haven’t spent as much time correcting and investigating the county side of things, but I will continue to look into it and update this site as I figure things out.</p>
 </div>
