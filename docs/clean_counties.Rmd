@@ -1,0 +1,213 @@
+---
+title: "CleaningCounties"
+author: "Kelley Erickson"
+date: "April 2, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+As a working example, let's look at records of Tracheophytes in Florida. These data came from downloading  (on GBIF) all of the occurrences of Tracheophytes that: 
+1. Had no coordinates
+2. stateProvince == "Florida"
+
+The shape polygon 'florida' that I loaded in came from the GADM shape file for the United States clipped to Florida. 
+```{r, load data}
+
+load("C:/Users/kerickson/Documents/GitHub/!Data/Tracheophytes No Coordinates/tracheophytes_nocoords.RData")
+
+load("C:/Users/kerickson/Documents/GitHub/!Data/florida.RData")
+
+head(tracheophytes_nocoords)
+```
+
+Now let's get the list of county names from GADM as well as all the different ways that counties are written in our dataset from GBIF: 
+```{r, getting list of GADM county names}
+
+#What are the GADM names of the counties in Florida? 
+GADM_counties <- unique(florida@data$NAME_2)
+#Refactor so levels only correspond to counties in FL (optional)
+GADM_counties <- factor(GADM_counties) 
+GADM_counties 
+length(GADM_counties) 
+
+#There are 67 counties in Florida 
+
+length(GADM_counties) 
+```
+
+And now the GBIF counties: 
+```{r, getting list of GBIF county names} 
+
+GBIF_counties <- unique(tracheophytes_nocoords$county)
+#Refactor so levels only correspond to counties in FL (optional)
+GBIF_counties <- factor(GBIF_counties)
+GBIF_counties 
+
+length(GBIF_counties)
+```
+
+Notice how in the GBIF_counties: 
+
+ * Some of the counties have state and country: Franklin County, Florida, United States
+ * Some of them are written in all-caps: OSCEOLA vs. Osceola
+ * Some of them have parentheses around them: (Lake) instead of Lake 
+ * Some of them have the state in parentheses: Leon Co. (FL)
+ * A single county could be written multiple ways: Fulton Co., Fulton, Fulton County
+ * There are misspellings: Semiole (should be Seminole) 
+ * There are also quite a few that don't seem to match up with any of the GADM  counties
+ 
+ If we were to only use records that had county names that matched GADM-county names we would be throwing out a lot of records: 
+ 
+```{r, see how many records actually match GADM counties right now}
+
+
+tracheophytes_clean <- subset(tracheophytes_nocoords, tracheophytes_nocoords$county %in% GADM_counties)
+nrow(tracheophytes_clean)
+
+#Now there are 128,268 records with GADM standard names 
+```
+#1. Remove extraneous text 
+First let's focus on removing all of the extraneous punctuation and words. I have put several lines of code into a function so that it can be easily applied to different data frames.   
+
+```{r, remove extraneous text} 
+
+
+removeExtraText <- function(df_column) {
+  df_column <- gsub(df_column, pattern='(', replacement='', fixed=T)
+  df_column <- gsub(df_column, pattern=')', replacement='', fixed=T)
+  df_column <- gsub(df_column, pattern=' County', replacement='', 
+                            fixed=T)
+  df_column <- gsub(df_column, pattern = ', Florida, United States', replacement = "", fixed=T)
+  df_column <- gsub(df_column, pattern =' COUNTY', replacement='', fixed=T)
+  df_column <- gsub(df_column, pattern='County of ', replacement='')
+  df_column <- gsub(df_column, pattern=' Cty.', replacement='')
+  df_column <- gsub(df_column, pattern=' Cty', replacement='')
+  df_column <- gsub(df_column, pattern=' Co.', replacement='')
+  df_column <- gsub(df_column, pattern='Ste ', replacement='Saint ')
+  df_column <- gsub(df_column, pattern='St. ', replacement='Saint ')
+  df_column <- gsub(df_column, pattern='St ', replacement='Saint ')
+  df_column <- gsub(df_column, pattern ='ST.', replacement = 'Saint')
+  df_column <- gsub(df_column, pattern = 'st.', replacement = 'Saint')
+  df_column <- gsub(df_column, pattern = " ' ", replacement = "")
+  df_column <- gsub(df_column, pattern='[', replacement='', fixed=T)
+  df_column <- gsub(df_column, pattern=']', replacement='', fixed=T)
+  df_column <- gsub(df_column, pattern=' FL', replacement='')
+return(df_column)
+} 
+
+
+tracheophytes_nocoords$county <- removeExtraText(tracheophytes_nocoords$county)
+
+#Let's check what we've fixed so far: 
+unique(tracheophytes_nocoords$county)
+
+tracheophytes_clean <- subset(tracheophytes_nocoords, tracheophytes_nocoords$county %in% GADM_counties)
+nrow(tracheophytes_clean)
+
+#Now there are 240, 175 records with GADM standard county names. An improvement!
+```  
+Starting to look better!
+#2. Fix capitalization 
+The next thing to standardize is how GBIF counties are capitalized: 
+```{r, fix capitalization}
+#The capwords function comes from the chartr {base} helpfile
+
+#First convert everything to lowercase 
+
+tracheophytes_nocoords$county <- tolower(tracheophytes_nocoords$county)
+
+#Now recapitalize using sentence case using a function that was written out in the chartr {base} helpfile 
+
+capwords <- function(s, strict = FALSE) {
+  cap <- function(s) paste(toupper(substring(s, 1, 1)),
+                           {s <- substring(s, 2); if(strict) tolower(s) else s},
+                           sep = "", collapse = " " )
+  sapply(strsplit(s, split = " "), cap, USE.NAMES = !is.null(names(s)))
+}
+
+tracheophytes_nocoords$county <- capwords(tracheophytes_nocoords$county)
+#Check our work: All counties should now be in regular sentence case 
+unique(tracheophytes_nocoords$county) 
+
+tracheophytes_clean <- subset(tracheophytes_nocoords, tracheophytes_nocoords$county %in% GADM_counties)
+nrow(tracheophytes_clean)
+#Now there are 225, 821 records that have GADM-standard counties. Not quite sure why it went down again...  
+```
+
+ At this point in the cleanup, the main thing we notice about the list of GBIF county names is that there are a lot of misspellings. This is the part that involves a lot of looking at differences.
+ 
+ I have written two functions `compare` and `printIssues` that help automate some of the process. First the `compare` function figures out all of the counties whose names are "close-enough" to other counties names 
+ 
+ The `printIssues` function prints out groupings that the `compare` function noticed as being potentially similar to eachother. Groupings are separated by '...'. 
+ 
+ You will notice right away that not everything the computer identifies as being similar is actually similar. Hence the need for a human to read through them and spot similarities. 
+
+```{r, a function to help spot similar looking spellings} 
+#The function compare 
+compare <- function(this, that) {
+    issues <- NULL
+
+    for (i in 1:length(this)){
+      test<-agrep(this[i], that)
+      if (length(test)>1) {
+        issues <- c(issues, as.character(this[i]))
+      }
+    }
+
+return(issues)
+}
+
+#The function printIssues 
+printIssues <- function (issues, compareList) {
+  for (i in 1:length(issues)) {
+  print(agrep(issues[i], compareList, value=T))
+  print("...")
+  }
+}
+
+counties_GBIF <- unique(tracheophytes_nocoords$county)
+#These functions will not work if there is a blank county name: ""
+counties_GBIF <- subset(counties_GBIF, counties_GBIF !="")
+
+issues<- compare(counties_GBIF, counties_GBIF)
+printIssues(issues, counties_GBIF)
+```
+
+#The final step (really it's an iterative process):
+Now let's fix some of those spellings by making use of a crosswalk table. I have gone through the list above and put misspellings that I noticed into the csv file. 
+
+As you go through you will probably introduce some new errors: For example if you are trying to convert 'Saint John' to the GADM-standard Saint Johns, records that already had Saint Johns correctly spelled will suddenly become Saint Johnss. So you will then need to replace 'Saint Johnss' with Saint Johns. So it's a very iterative process.
+
+The .csv file counties_lookup contains the crosswalk table I constructed. The function `renameCounties` makes use of the crosswalk table to correct the spelling of GBIF counties to resemble GADM spellings. I have so far only been working with counties in Florida. This function and the ones above will have to be modified to work for different states. 
+
+```{r, making use of the crosswalk table}
+
+renameCounties <- function(df) {
+
+  temp <- read.csv(file="C:/Users/kerickson/Documents/GitHub/sundries/R/county_lookup.csv"  )
+  for(i in 1:nrow(temp)) {
+    df$recordedBy <- gsub(df$recordedBy, pattern = paste0("\\b", temp$Incorrect[i], "\\b"), 
+                          replacement = temp$GADM[i], fixed=T)
+  }
+
+  return(df)
+}
+
+tracheophytes_nocoords <-renameCounties(tracheophytes_nocoords)
+tracheophytes_clean <- subset(tracheophytes_nocoords, tracheophytes_nocoords$county %in% GADM_counties)
+nrow(tracheophytes_clean)
+#Now there are 225, 822 records that have GADM-standard counties. Not quite sure why it went down again...
+tracheophytes_messy <- subset(tracheophytes_nocoords, !(tracheophytes_nocoords$county %in% GADM_counties))
+
+unique(tracheophytes_messy$county)
+
+
+```
+#Next step: figure out why the renameCounty function isn't working 100%
+
+As you can see from the unique list of "messy" records (those whose county still doesn't officially match a GADM county), there are still some counties whose spellings _should_ have been fixed by the renameCounty function. And yet... 
+
+I modified this workflow from a similar process for renaming collectors, so haven't spent as much time correcting and investigating the county side of things, but I will continue to look into it and update this site as I figure things out. 
